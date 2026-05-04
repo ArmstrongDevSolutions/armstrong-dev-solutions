@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navLinks = [
-  { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/services", label: "Services" },
   { href: "/projects", label: "Projects" },
@@ -15,28 +15,32 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+    <header className="shrink-0 bg-[var(--surface-header)] backdrop-blur">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-start gap-x-3 gap-y-2 px-6 py-3 sm:gap-x-4 sm:py-3.5">
         <Link
           href="/"
-          className="text-lg font-semibold tracking-tight text-slate-900"
+          className="min-w-0 justify-self-start pt-0.5 text-base font-semibold leading-tight tracking-tight text-[var(--foreground)] sm:text-lg"
         >
-          Armstrong Dev Solutions
+          Armstrong Dev Solutions 🤘
         </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav
+          className="flex max-w-full shrink-0 flex-nowrap justify-center gap-1.5 sm:gap-2"
+          aria-label="Primary"
+        >
           {navLinks.map((link) => {
-            const isActive =
-              link.href === "/" ? pathname === link.href : pathname.startsWith(link.href);
+            const isActive = pathname.startsWith(link.href);
 
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-md px-3 py-2 text-sm transition-colors ${
+                className={`rounded-md px-2.5 py-2 text-sm transition-colors sm:px-3 ${
                   isActive
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-[var(--accent)] font-medium text-[var(--accent-foreground)]"
+                    : link.href === "/projects"
+                      ? "border border-[var(--accent)] bg-[var(--surface)] font-medium text-[var(--foreground)] hover:bg-[var(--border-strong)] dark:border-transparent dark:bg-transparent dark:text-[var(--elephant-400)] dark:hover:bg-[var(--elephant-900)]/60"
+                      : "text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] dark:hover:bg-[var(--surface-hover)]"
                 }`}
               >
                 {link.label}
@@ -44,6 +48,10 @@ export default function Navbar() {
             );
           })}
         </nav>
+
+        <div className="flex justify-self-end pt-0.5">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

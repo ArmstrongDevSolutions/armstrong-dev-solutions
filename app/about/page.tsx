@@ -1,19 +1,20 @@
 export default function AboutPage() {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">About</h1>
-      <div className="mt-6 space-y-4 text-slate-600">
+    <section className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-sm sm:mt-10 sm:p-10">
+      <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">About</h1>
+      <div className="mt-6 space-y-4 text-[var(--foreground-muted)]">
         <p>
-          Hi, I am Mike Armstrong. I build practical web solutions that solve real problems
-          for small businesses and organizations.
+          Hi, I am Mike Armstrong. I build practical web solutions for small businesses,
+          local organizations, and recreational leagues.
         </p>
         <p>
-          [Placeholder] Add your background, what industries you have worked with, and what
-          makes your approach reliable and collaborative.
+          Armstrong Dev Solutions is my side business, and I take on projects that I truly
+          care about. I enjoy creating software that helps real people do meaningful work.
         </p>
         <p>
-          My focus is creating useful tools that are simple to use, easy to maintain, and
-          designed around real workflows rather than unnecessary complexity.
+          I love sports, music, and building useful tools with a fun, approachable style. My
+          goal is to leave a positive impact through software that is simple to use, easy to
+          maintain, and designed around real day-to-day workflows. Rock on 🤘
         </p>
       </div>
     </section>

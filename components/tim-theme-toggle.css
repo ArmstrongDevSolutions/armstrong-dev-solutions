@@ -1,0 +1,155 @@
+/**
+ * Tim Silva toggle track + ::before / ::after (style.css), scoped for Next.js.
+ * html.dark .tim-theme-toggle …
+ */
+
+.tim-theme-toggle {
+  --gray-5: #010101;
+  --gray-10: #040404;
+  --gray-15: #070808;
+  --gray-20: #0d0d0e;
+  --gray-25: #141516;
+  --gray-30: #1e2022;
+  --gray-35: #2d2f31;
+  --gray-40: #404346;
+  --gray-45: #5b5e62;
+  --gray-50: #7c8084;
+  --gray-55: #9da1a5;
+  --gray-60: #b9bdc1;
+  --gray-65: #cdd1d5;
+  --gray-70: #dce0e3;
+  --gray-75: #e7eaed;
+  --gray-80: #eff2f5;
+  --gray-85: #f4f7fa;
+  --gray-90: #f7fafd;
+  --gray-95: #fcfefe;
+  --animate: 200ms;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tim-theme-toggle .toggle-switch {
+  margin: 0;
+  padding: 0;
+  width: 48px;
+  height: 28px;
+  border: none;
+  outline: none;
+  overflow: hidden;
+  position: relative;
+  border-radius: 14px;
+  display: inline-block;
+  background: var(--gray-40);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
+}
+
+html.dark .tim-theme-toggle .toggle-switch {
+  width: 48px;
+}
+
+.tim-theme-toggle .toggle-switch,
+.tim-theme-toggle .toggle-switch::before,
+.tim-theme-toggle .toggle-switch::after {
+  transition: all var(--animate) ease-in-out;
+}
+
+html.dark .tim-theme-toggle .toggle-switch {
+  background: var(--gray-70);
+}
+
+.tim-theme-toggle .toggle-switch::before {
+  top: 4px;
+  left: 24px;
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: block;
+  position: absolute;
+  border-radius: 12px;
+  background: var(--gray-70);
+}
+
+html.dark .tim-theme-toggle .toggle-switch::before {
+  left: 4px;
+  background: var(--gray-35);
+}
+
+.tim-theme-toggle .toggle-switch::after {
+  content: "";
+  top: 14px;
+  right: 2px;
+  width: 1px;
+  height: 1px;
+  display: block;
+  position: absolute;
+  border-radius: 0.5px;
+  background: var(--gray-40);
+}
+
+html.dark .tim-theme-toggle .toggle-switch::after {
+  top: -2px;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--gray-70);
+}
+
+.tim-theme-toggle .toggle-switch:hover,
+.tim-theme-toggle .toggle-switch:hover::after {
+  background: var(--gray-35);
+}
+
+.tim-theme-toggle .toggle-switch:active,
+.tim-theme-toggle .toggle-switch:active::after {
+  background: var(--gray-25);
+}
+
+html.dark .tim-theme-toggle .toggle-switch:hover,
+html.dark .tim-theme-toggle .toggle-switch:hover::after {
+  background: var(--gray-95);
+}
+
+html.dark .tim-theme-toggle .toggle-switch:active,
+html.dark .tim-theme-toggle .toggle-switch:active::after {
+  background: var(--gray-65);
+}
+
+.tim-theme-toggle.noselect {
+  user-select: none;
+  -ms-user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+}
+
+.tim-theme-toggle .toggle-switch:focus-visible {
+  outline: 2px solid var(--gray-45);
+  outline-offset: 2px;
+}
+
+html.dark .tim-theme-toggle .toggle-switch:focus-visible {
+  outline-color: var(--gray-80);
+}
+
+.tim-theme-toggle .disableEasingTemporarily,
+.tim-theme-toggle .disableEasingTemporarily::after,
+.tim-theme-toggle .disableEasingTemporarily::before {
+  -o-transition-property: none !important;
+  -moz-transition-property: none !important;
+  -ms-transition-property: none !important;
+  -webkit-transition-property: none !important;
+  transition-property: none !important;
+  -o-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -webkit-transform: none !important;
+  transform: none !important;
+  -webkit-animation: none !important;
+  -moz-animation: none !important;
+  -o-animation: none !important;
+  -ms-animation: none !important;
+  animation: none !important;
+}

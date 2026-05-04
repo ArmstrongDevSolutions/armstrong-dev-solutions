@@ -1,8 +1,67 @@
 @import "tailwindcss";
 
+/* Manual theme toggle uses `.dark` on <html>; default Tailwind `dark:` follows prefers-color-scheme only. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/**
+ * Elephant palette (UI Colors / Tailwind-style scale).
+ * Export from UI Colors can replace the --elephant-* block to stay in sync.
+ */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --elephant-50: #eef9ff;
+  --elephant-100: #dcf3ff;
+  --elephant-200: #b2e9ff;
+  --elephant-300: #6dd8ff;
+  --elephant-400: #20c7ff;
+  --elephant-500: #00beff;
+  --elephant-600: #00a0df;
+  --elephant-700: #007fb4;
+  --elephant-800: #006a95;
+  --elephant-900: #00547a;
+  --elephant-950: #003049;
+
+  /* Light theme (clean page + navy type, cyan CTAs — like UI Colors “Website” light) */
+  --background: #ffffff;
+  --foreground: var(--elephant-950);
+  --foreground-muted: var(--elephant-800);
+  --foreground-subtle: var(--elephant-700);
+  --surface: var(--elephant-50);
+  --surface-card: #ffffff;
+  --surface-header: rgba(255, 255, 255, 0.92);
+  --border: var(--elephant-200);
+  --border-strong: var(--elephant-100);
+  --accent: var(--elephant-500);
+  --accent-hover: var(--elephant-600);
+  /* Cyan / white UI: label text stays black per spec */
+  --accent-foreground: #000000;
+  --text-on-light-surface: #000000;
+  --ring: var(--elephant-400);
+  --input-bg: var(--elephant-50);
+}
+
+.dark {
+  /**
+   * Dark theme: true black UI (UI Colors Forward-style reference).
+   * Text on black: #f4f4f5 (primary), #a1a1aa (subtext).
+   * Text on blue/white surfaces: #000000 via --accent-foreground / --text-on-light-surface.
+   */
+  --background: #000000;
+  --foreground: #f4f4f5;
+  --foreground-muted: #a1a1aa;
+  --foreground-subtle: #a1a1aa;
+  --surface: #000000;
+  --surface-card: #000000;
+  --surface-header: #000000;
+  --surface-hover: #171717;
+  --border: #262626;
+  --border-strong: #333333;
+  --input-bg: #000000;
+  /* Accent (you’ll tune blues next); button label stays black on cyan */
+  --accent: var(--elephant-400);
+  --accent-hover: var(--elephant-500);
+  --accent-foreground: #000000;
+  --text-on-light-surface: #000000;
+  --ring: var(--elephant-400);
 }
 
 @theme inline {
@@ -16,4 +75,21 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.dark ::placeholder {
+  color: var(--foreground-muted);
+  opacity: 1;
+}
+
+/* Break hero out to full viewport width from inside padded max-width main */
+.hero-bleed-wrapper {
+  position: relative;
+  left: 50%;
+  width: 100vw;
+  max-width: 100vw;
+  transform: translateX(-50%);
 }
