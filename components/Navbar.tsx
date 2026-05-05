@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { House } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const navLinks = [
@@ -13,6 +14,29 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const isDoublesRoute = pathname.startsWith("/doubles");
+
+  if (isDoublesRoute) {
+    return (
+      <header className="sticky top-0 z-50 shrink-0 bg-[#002b4d]">
+        <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <h1 className="m-0 text-lg font-bold text-white sm:text-xl">
+            Random Doubles:
+            <br className="sm:hidden" />
+            <span className="sm:ml-1">Player Check-In</span>
+          </h1>
+          <a
+            href="https://www.armstrongdevsolutions.com"
+            className="inline-flex items-center justify-center text-[#00b4d8] no-underline transition-opacity hover:opacity-85"
+            aria-label="Return to Armstrong Dev Solutions home"
+          >
+            <House className="h-5 w-5 sm:hidden" />
+            <span className="hidden text-sm font-semibold sm:inline sm:text-base">← Armstrong Dev Solutions</span>
+          </a>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="shrink-0 bg-[var(--surface-header)] backdrop-blur">

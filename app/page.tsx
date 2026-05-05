@@ -55,6 +55,7 @@ export default function Home() {
             darkPanel="900"
             title="Random Doubles League Manager"
             status="In Development"
+            href="/doubles"
             description="A web app for managing disc golf leagues, checking in players, ranking them, and generating balanced teams so weekly operations are faster and easier."
           />
           <ProjectCard
