@@ -8,7 +8,8 @@ type PaymentMethod = "" | "Cash" | "Venmo" | "PayPal";
 type RatingType = "" | "PDGA" | "UDisc" | "Other";
 
 export interface CheckInData {
-  name: string;
+  firstName: string;
+  lastName: string;
   rating: number;
   ratingType: "PDGA" | "UDisc" | "Other";
   leagueFeePaid: boolean;
@@ -18,7 +19,8 @@ export interface CheckInData {
 }
 
 export interface ModalInitialData {
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   rating?: number;
   ratingType?: RatingType;
   leagueFeePaid?: boolean;
@@ -187,7 +189,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
   const isMobile = useIsMobile();
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [rating, setRating] = useState("");
   const [ratingType, setRatingType] = useState<RatingType>("");
   const [leagueFeePaid, setLeagueFeePaid] = useState(false);
@@ -197,7 +200,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
 
   useEffect(() => {
     if (isOpen) {
-      setName(initialData?.name ?? "");
+      setFirstName(initialData?.firstName ?? "");
+      setLastName(initialData?.lastName ?? "");
       setRating(initialData?.rating ? String(initialData.rating) : "");
       setRatingType(initialData?.ratingType ?? "");
       setLeagueFeePaid(initialData?.leagueFeePaid ?? false);
@@ -212,7 +216,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
   if (!isOpen) return null;
 
   const canSubmit =
-    name.trim().length > 0 &&
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
     rating.trim().length > 0 &&
     !isNaN(parseInt(rating, 10)) &&
     ratingType !== "" &&
@@ -222,7 +227,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
   function handleConfirm() {
     if (!canSubmit) return;
     onConfirm({
-      name: name.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       rating: parseInt(rating, 10),
       ratingType: ratingType as "PDGA" | "UDisc" | "Other",
       leagueFeePaid,
@@ -341,17 +347,30 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
             overflowY: "auto",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "#002b4d" }}>Name</label>
-            <input
-              type="text"
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              style={inputBase}
-              {...focusHandlers}
-            />
+          <div style={{ display: "flex", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+              <label style={{ fontSize: "13px", fontWeight: 600, color: "#002b4d" }}>First Name</label>
+              <input
+                type="text"
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                autoFocus
+                style={inputBase}
+                {...focusHandlers}
+              />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+              <label style={{ fontSize: "13px", fontWeight: 600, color: "#002b4d" }}>Last Name</label>
+              <input
+                type="text"
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                style={inputBase}
+                {...focusHandlers}
+              />
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: "12px" }}>

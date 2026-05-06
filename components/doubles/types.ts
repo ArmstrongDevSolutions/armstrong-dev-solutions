@@ -1,7 +1,8 @@
 export interface CheckedInPlayer {
   uid: string;
   rosterId?: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   rating: number;
   ratingType: "PDGA" | "UDisc" | "Other";
   leagueFeePaid: boolean;
@@ -18,7 +19,12 @@ export interface AcePotDonation {
 
 export interface RosterPlayer {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   rating: number;
   ratingType: "PDGA" | "UDisc" | "Other";
+}
+
+export function formatFullName(firstName: string, lastName: string) {
+  return `${firstName} ${lastName}`.trim();
 }

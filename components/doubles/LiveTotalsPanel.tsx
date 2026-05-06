@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Check, Disc, DollarSign, Flag, Plus, TrendingUp, X } from "lucide-react";
-import { AcePotDonation, CheckedInPlayer } from "./types";
+import { AcePotDonation, CheckedInPlayer, formatFullName } from "./types";
 import { useIsMobile } from "./useIsMobile";
-import { EndWeekModal } from "./EndWeekModal";
+import { EndWeekModal, PayoutSelection } from "./EndWeekModal";
 
 function AddToPotModal({
   isOpen,
@@ -222,7 +222,7 @@ interface Props {
   acePotDonations: AcePotDonation[];
   isWorking?: boolean;
   onAddDonation: (donation: AcePotDonation) => Promise<void> | void;
-  onEndWeek: (acePotHit: boolean, aceCount: number) => Promise<void> | void;
+  onEndWeek: (acePotHit: boolean, aceCount: number, payouts: PayoutSelection[]) => Promise<void> | void;
 }
 
 export function LiveTotalsPanel({
@@ -444,7 +444,7 @@ export function LiveTotalsPanel({
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#00b4d8", flexShrink: 0 }} />
-                  <span style={{ fontSize: "14px", color: "#002b4d", fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ fontSize: "14px", color: "#002b4d", fontWeight: 500 }}>{formatFullName(p.firstName, p.lastName)}</span>
                 </div>
                 <span style={{ fontSize: "13px", color: "#64748b" }}>1 entry</span>
               </div>

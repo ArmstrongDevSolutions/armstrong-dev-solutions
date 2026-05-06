@@ -10,6 +10,14 @@ export type PayoutRow = {
   percentLabel?: string;
 };
 
+export type PaymentMethod = "Cash" | "Venmo" | "PayPal";
+
+export type PayoutSelection = {
+  place: string;
+  amount: number;
+  method: PaymentMethod;
+};
+
 /**
  * Teams for End Week / payouts: teams of 2 whenever possible.
  * Even players → teams = players / 2. Odd players → teams = players / 2 rounded up (e.g. 19 players → 10 teams).
@@ -42,11 +50,12 @@ interface Props {
   playerCount: number;
   totalPayoutPool: number;
   acePotTotal: number;
-  onConfirm: (acePotHit: boolean, aceCount: number) => void | Promise<void>;
+  onConfirm: (acePotHit: boolean, aceCount: number, payouts: PayoutSelection[]) => void | Promise<void>;
 }
 
 type Step = 1 | 2 | 3;
 type AceSubStep = "question" | "details";
+const PAYMENT_METHODS: PaymentMethod[] = ["Cash", "Venmo", "PayPal"];
 
 function ProgressHeader({ step }: { step: Step }) {
   const labels = ["1. PAYOUT", "2. ACE POT", "3. CONFIRM"] as const;
@@ -96,6 +105,7 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
   const [aceSubStep, setAceSubStep] = useState<AceSubStep>("question");
   const [aceChoice, setAceChoice] = useState<null | "yes" | "no">(null);
   const [aceCount, setAceCount] = useState(1);
+  const [payoutMethods, setPayoutMethods] = useState<Record<string, PaymentMethod | "">>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -103,6 +113,7 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
       setAceSubStep("question");
       setAceChoice(null);
       setAceCount(1);
+      setPayoutMethods({});
     }
   }, [isOpen]);
 
@@ -114,6 +125,7 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
 
   const step2NextEnabled =
     aceChoice === "no" || (aceChoice === "yes" && aceSubStep === "details" && aceCount >= 1);
+  const step1NextEnabled = payoutRows.every((row) => PAYMENT_METHODS.includes(payoutMethods[row.place] as PaymentMethod));
 
   if (!isOpen) return null;
 
@@ -238,7 +250,12 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
   }
 
   async function handleConfirmEndWeek() {
-    await onConfirm(aceChoice === "yes", aceChoice === "yes" ? aceCount : 0);
+    const payouts: PayoutSelection[] = payoutRows.map((row) => ({
+      place: row.place,
+      amount: row.amount,
+      method: (payoutMethods[row.place] as PaymentMethod) || "Cash",
+    }));
+    await onConfirm(aceChoice === "yes", aceChoice === "yes" ? aceCount : 0, payouts);
     onClose();
   }
 
@@ -359,40 +376,95 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
                     key={row.place}
                     style={{
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
+                      flexDirection: "column",
                       padding: "16px 18px",
                       borderRadius: "14px",
                       border: "1.5px solid #dbeafe",
                       background: "#ffffff",
-                      gap: "12px",
+                      gap: "14px",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
-                      <div
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "8px",
+                            background: "#0077cc",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Trophy size={18} color="#ffffff" strokeWidth={2.5} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <span style={{ fontSize: "15px", fontWeight: 700, color: "#002b4d" }}>{row.place}</span>
+                          {row.percentLabel ? (
+                            <span style={{ fontSize: "12px", color: "#64748b" }}>{row.percentLabel}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: "20px", fontWeight: 700, color: "#0077cc", flexShrink: 0 }}>
+                        ${row.amount}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <span
                         style={{
-                          width: "36px",
-                          height: "36px",
-                          borderRadius: "8px",
-                          background: "#0077cc",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
+                          fontSize: "12px",
+                          color: "#94a3b8",
+                          margin: 0,
+                          fontWeight: 600,
+                          letterSpacing: "0.08em",
                         }}
                       >
-                        <Trophy size={18} color="#ffffff" strokeWidth={2.5} />
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                        <span style={{ fontSize: "15px", fontWeight: 700, color: "#002b4d" }}>{row.place}</span>
-                        {row.percentLabel ? (
-                          <span style={{ fontSize: "12px", color: "#64748b" }}>{row.percentLabel}</span>
-                        ) : null}
+                        PAYOUT METHOD
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          width: "100%",
+                          borderRadius: "10px",
+                          border: "1.5px solid #bfdbfe",
+                          overflow: "hidden",
+                          background: "#f8fafc",
+                        }}
+                      >
+                        {PAYMENT_METHODS.map((method, i) => {
+                          const active = payoutMethods[row.place] === method;
+                          return (
+                            <button
+                              key={`${row.place}-${method}`}
+                              type="button"
+                              onClick={() =>
+                                setPayoutMethods((prev) => ({
+                                  ...prev,
+                                  [row.place]: method,
+                                }))
+                              }
+                              style={{
+                                flex: 1,
+                                padding: "12px 0",
+                                minHeight: "44px",
+                                border: "none",
+                                borderLeft: i > 0 ? "1.5px solid #bfdbfe" : "none",
+                                background: active ? "#0077cc" : "transparent",
+                                color: active ? "#ffffff" : "#475569",
+                                fontSize: "14px",
+                                fontWeight: active ? 600 : 400,
+                                cursor: "pointer",
+                                textAlign: "center",
+                              }}
+                            >
+                              {method}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                    <span style={{ fontSize: "20px", fontWeight: 700, color: "#0077cc", flexShrink: 0 }}>
-                      ${row.amount}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -775,7 +847,12 @@ export function EndWeekModal({ isOpen, onClose, playerCount, totalPayoutPool, ac
               <button type="button" style={{ ...btnGhost, flex: 1 }} onClick={onClose}>
                 Cancel
               </button>
-              <button type="button" style={{ ...btnPrimary, flex: 2 }} onClick={() => setStep(2)}>
+              <button
+                type="button"
+                style={step1NextEnabled ? { ...btnPrimary, flex: 2 } : { ...btnPrimaryDisabled, flex: 2 }}
+                disabled={!step1NextEnabled}
+                onClick={() => step1NextEnabled && setStep(2)}
+              >
                 Next →
               </button>
             </>

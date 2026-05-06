@@ -6,9 +6,10 @@ import { Eye, EyeOff } from "lucide-react";
 import { CheckInPanel } from "./CheckInPanel";
 import { LiveTotalsPanel } from "./LiveTotalsPanel";
 import type { CheckInData } from "./CheckInModal";
-import { AcePotDonation, CheckedInPlayer, RosterPlayer } from "./types";
+import { AcePotDonation, CheckedInPlayer, formatFullName, RosterPlayer } from "./types";
 import { useIsMobile } from "./useIsMobile";
 import { hasSupabaseConfig, supabase } from "@/lib/supabaseClient";
+import type { PayoutSelection } from "./EndWeekModal";
 
 export default function DoublesCheckInApp() {
   const isMobile = useIsMobile();
@@ -76,10 +77,14 @@ export default function DoublesCheckInApp() {
     };
   }, []);
 
-  function mapDbError(error: PostgrestError | null, fallback = "Something went wrong. Please try again.") {
+  function mapDbError(error: PostgrestError | Error | null, fallback = "Something went wrong. Please try again.") {
     if (!error) return fallback;
-    if (error.code === "42501") return "You must be logged in to access this data";
-    if (error.code === "23505") return "This player is already checked in";
+    if ("code" in error && error.code === "42501") return "You must be logged in to access this data";
+    if ("code" in error && error.code === "23505") return "This player is already checked in";
+    if ("code" in error && error.code === "23502") {
+      return 'Database constraint error: a required column is still null. If this mentions players.name, drop the NOT NULL constraint or remove the old "name" column.';
+    }
+    if ("message" in error && error.message) return error.message;
     return fallback;
   }
 
@@ -118,13 +123,14 @@ export default function DoublesCheckInApp() {
       const [playersRes, checkInsRes, potRes, donationsRes] = await Promise.all([
         supabase
           .from("players")
-          .select("id, name, rating, rating_type")
+          .select("id, first_name, last_name, rating, rating_type")
           .eq("is_active", true)
-          .order("name", { ascending: true }),
+          .order("first_name", { ascending: true })
+          .order("last_name", { ascending: true }),
         supabase
           .from("check_ins")
           .select(
-            "id, player_id, league_fee_paid, league_fee_payment_method, ace_pot_paid, ace_pot_payment_method, checked_in_rating, checked_in_rating_type, players!inner(id, name, rating, rating_type)",
+            "id, player_id, league_fee_paid, league_fee_payment_method, ace_pot_paid, ace_pot_payment_method, checked_in_rating, checked_in_rating_type, players!inner(id, first_name, last_name, rating, rating_type)",
           )
           .eq("league_night_id", leagueNightId)
           .order("created_at", { ascending: true }),
@@ -144,7 +150,8 @@ export default function DoublesCheckInApp() {
 
       const mappedRoster: RosterPlayer[] = (playersRes.data ?? []).map((p) => ({
         id: p.id as string,
-        name: p.name as string,
+        firstName: (p.first_name as string) ?? "",
+        lastName: (p.last_name as string) ?? "",
         rating: Number(p.rating ?? 0),
         ratingType: (p.rating_type as "PDGA" | "UDisc" | "Other") ?? "Other",
       }));
@@ -154,7 +161,8 @@ export default function DoublesCheckInApp() {
         return {
           uid: row.id as string,
           rosterId: row.player_id as string,
-          name: (player?.name as string) ?? "",
+          firstName: (player?.first_name as string) ?? "",
+          lastName: (player?.last_name as string) ?? "",
           rating: Number((row.checked_in_rating as number) ?? player?.rating ?? 0),
           ratingType:
             ((row.checked_in_rating_type as "PDGA" | "UDisc" | "Other") ??
@@ -323,7 +331,8 @@ export default function DoublesCheckInApp() {
       const { data: insertedPlayer, error: playerError } = await supabase
         .from("players")
         .insert({
-          name: data.name,
+          first_name: data.firstName,
+          last_name: data.lastName,
           rating: data.rating,
           rating_type: data.ratingType,
           is_active: true,
@@ -378,7 +387,8 @@ export default function DoublesCheckInApp() {
       const { error: playerUpdateError } = await supabase
         .from("players")
         .update({
-          name: data.name,
+          first_name: data.firstName,
+          last_name: data.lastName,
           rating: data.rating,
           rating_type: data.ratingType,
         })
@@ -521,13 +531,77 @@ export default function DoublesCheckInApp() {
     }
   }
 
-  async function handleEndWeek(acePotHit: boolean, aceCount: number) {
+  async function handleEndWeek(acePotHit: boolean, aceCount: number, payouts: PayoutSelection[]) {
     if (!session || !activeLeagueNightId) return;
     setIsWorking(true);
     setAppError("");
     try {
       const nightId = activeLeagueNightId;
       const effectiveAcePot = Math.max(0, acePot);
+      const leagueFeeByMethod = checkedInPlayers.reduce(
+        (acc, player) => {
+          if (!player.leagueFeePaid || !player.leagueFeeMethod) return acc;
+          acc[player.leagueFeeMethod] += 8;
+          return acc;
+        },
+        { Cash: 0, Venmo: 0, PayPal: 0 },
+      );
+      const payoutByMethod = payouts.reduce(
+        (acc, payout) => {
+          acc[payout.method] += payout.amount;
+          return acc;
+        },
+        { Cash: 0, Venmo: 0, PayPal: 0 },
+      );
+      const expectedAfterPayout = {
+        Cash: leagueFeeByMethod.Cash - payoutByMethod.Cash,
+        Venmo: leagueFeeByMethod.Venmo - payoutByMethod.Venmo,
+        PayPal: leagueFeeByMethod.PayPal - payoutByMethod.PayPal,
+      };
+      const totalLeagueFees = leagueFeeByMethod.Cash + leagueFeeByMethod.Venmo + leagueFeeByMethod.PayPal;
+      const totalWinningsPaid = payouts.reduce((sum, payout) => sum + payout.amount, 0);
+      const totalRemaining = expectedAfterPayout.Cash + expectedAfterPayout.Venmo + expectedAfterPayout.PayPal;
+
+      const reportResponse = await fetch("/api/league-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: new Date().toISOString(),
+          players: checkedInPlayers.map((player) => ({
+            name: formatFullName(player.firstName, player.lastName),
+            leagueFeePaid: player.leagueFeePaid,
+            leagueFeeMethod: player.leagueFeeMethod || "Unspecified",
+          })),
+          leagueFees: {
+            total: totalLeagueFees,
+            byMethod: leagueFeeByMethod,
+          },
+          payouts: {
+            total: totalWinningsPaid,
+            byMethod: payoutByMethod,
+            rows: payouts,
+          },
+          remaining: {
+            total: totalRemaining,
+            byMethod: expectedAfterPayout,
+          },
+          acePot: {
+            wasHit: acePotHit,
+            aceCount,
+            currentTotal: effectiveAcePot,
+          },
+        }),
+      });
+      if (!reportResponse.ok) {
+        let errorMessage = "Unable to email league report.";
+        try {
+          const payload = (await reportResponse.json()) as { error?: string };
+          if (payload?.error) errorMessage = payload.error;
+        } catch {
+          // Keep default error message if response is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
 
       if (acePotHit) {
         if (effectiveAcePot > 0) {
@@ -558,9 +632,10 @@ export default function DoublesCheckInApp() {
 
       await loadData();
     } catch (error) {
-      const dbError = error as PostgrestError;
+      const dbError = error as PostgrestError | Error;
       console.error("End week failed:", dbError);
       setAppError(mapDbError(dbError, "Unable to end the week."));
+      throw error;
     } finally {
       setIsWorking(false);
     }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Disc, Search, Trophy, UserPlus, X } from "lucide-react";
 import { CheckInData, CheckInModal } from "./CheckInModal";
 import { comparablePdgaRating } from "./poolRating";
-import { CheckedInPlayer, RosterPlayer } from "./types";
+import { CheckedInPlayer, formatFullName, RosterPlayer } from "./types";
 import { useIsMobile } from "./useIsMobile";
 
 type ModalTarget =
@@ -20,10 +20,18 @@ function tokenize(name: string) {
   return normalizePersonName(name).split(" ").filter(Boolean);
 }
 
+function rosterFullName(player: RosterPlayer) {
+  return formatFullName(player.firstName, player.lastName);
+}
+
+function checkedInFullName(player: CheckedInPlayer) {
+  return formatFullName(player.firstName, player.lastName);
+}
+
 function findDuplicateRosterPlayer(roster: RosterPlayer[], enteredName: string): RosterPlayer | undefined {
   const n = normalizePersonName(enteredName);
   if (!n) return undefined;
-  return roster.find((p) => normalizePersonName(p.name) === n);
+  return roster.find((p) => normalizePersonName(rosterFullName(p)) === n);
 }
 
 /** Suggest an unchecked roster row when the typed name looks like a nickname / subset (e.g. “Mike” vs “Mike Armstrong”). */
@@ -50,14 +58,14 @@ function findSimilarRosterPlayer(
     return false;
   }
 
-  const candidates = roster.filter((p) => !excludeCheckedInIds.has(p.id) && matches(p.name));
+  const candidates = roster.filter((p) => !excludeCheckedInIds.has(p.id) && matches(rosterFullName(p)));
   if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0];
 
   return [...candidates].sort(
     (a, b) =>
-      normalizePersonName(a.name).localeCompare(normalizePersonName(b.name)) ||
-      a.name.localeCompare(b.name),
+      normalizePersonName(rosterFullName(a)).localeCompare(normalizePersonName(rosterFullName(b))) ||
+      rosterFullName(a).localeCompare(rosterFullName(b)),
   )[0];
 }
 
@@ -68,7 +76,7 @@ function computePools(players: CheckedInPlayer[]) {
   );
   // Odd player count: A Pool gets the extra slot (ceil(n/2) strongest-first slice).
   const aCount = Math.ceil(sorted.length / 2);
-  const byAlpha = (arr: CheckedInPlayer[]) => [...arr].sort((a, b) => a.name.localeCompare(b.name));
+  const byAlpha = (arr: CheckedInPlayer[]) => [...arr].sort((a, b) => checkedInFullName(a).localeCompare(checkedInFullName(b)));
   return { aPool: byAlpha(sorted.slice(0, aCount)), bPool: byAlpha(sorted.slice(aCount)) };
 }
 
@@ -204,7 +212,7 @@ function PoolColumn({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#002b4d" }}>{p.name}</span>
+              <span style={{ fontSize: "14px", fontWeight: 600, color: "#002b4d" }}>{checkedInFullName(p)}</span>
               <div style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
                 {p.acePotPaid && <AceBadge />}
                 <RatingBadge type={p.ratingType} />
@@ -253,7 +261,7 @@ export function CheckInPanel({
   const searchResults = query.trim()
     ? rosterPlayers.filter(
         (p) =>
-          !checkedInRosterIds.has(p.id) && p.name.toLowerCase().includes(query.trim().toLowerCase()),
+          !checkedInRosterIds.has(p.id) && rosterFullName(p).toLowerCase().includes(query.trim().toLowerCase()),
       )
     : [];
 
@@ -278,13 +286,14 @@ export function CheckInPanel({
     }
 
     if (modalTarget.mode === "new") {
-      const dup = findDuplicateRosterPlayer(rosterPlayers, data.name);
+      const enteredFullName = formatFullName(data.firstName, data.lastName);
+      const dup = findDuplicateRosterPlayer(rosterPlayers, enteredFullName);
       if (dup) {
         setModalTarget(null);
-        setDuplicateNameBlock({ entered: data.name.trim(), rosterName: dup.name });
+        setDuplicateNameBlock({ entered: enteredFullName.trim(), rosterName: rosterFullName(dup) });
         return;
       }
-      const similar = findSimilarRosterPlayer(rosterPlayers, data.name, checkedInRosterIds);
+      const similar = findSimilarRosterPlayer(rosterPlayers, enteredFullName, checkedInRosterIds);
       if (similar) {
         setModalTarget(null);
         setSimilarSuggest({ roster: similar, draft: data });
@@ -323,7 +332,8 @@ export function CheckInPanel({
     if (!modalTarget) return undefined;
     if (modalTarget.mode === "existing") {
       return {
-        name: modalTarget.player.name,
+        firstName: modalTarget.player.firstName,
+        lastName: modalTarget.player.lastName,
         rating: modalTarget.player.rating,
         ratingType: modalTarget.player.ratingType,
       };
@@ -331,7 +341,8 @@ export function CheckInPanel({
     if (modalTarget.mode === "edit") {
       const p = modalTarget.player;
       return {
-        name: p.name,
+        firstName: p.firstName,
+        lastName: p.lastName,
         rating: p.rating,
         ratingType: p.ratingType,
         leagueFeePaid: p.leagueFeePaid,
@@ -492,7 +503,7 @@ export function CheckInPanel({
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
-                    <span style={{ fontSize: "15px", fontWeight: 600, color: "#002b4d" }}>{player.name}</span>
+                    <span style={{ fontSize: "15px", fontWeight: 600, color: "#002b4d" }}>{rosterFullName(player)}</span>
                     <span style={{ fontSize: "12px", color: "#64748b" }}>
                       Rating: <strong style={{ color: "#0077cc" }}>{player.rating}</strong>
                     </span>
@@ -736,7 +747,7 @@ export function CheckInPanel({
             </div>
             <div style={{ padding: isMobile ? "20px" : "24px 28px" }}>
               <p style={{ margin: 0, fontSize: "15px", color: "#334155", lineHeight: 1.6 }}>
-                Did you mean to check in <strong>{similarSuggest.roster.name}</strong> instead?
+                Did you mean to check in <strong>{rosterFullName(similarSuggest.roster)}</strong> instead?
               </p>
             </div>
             <div
