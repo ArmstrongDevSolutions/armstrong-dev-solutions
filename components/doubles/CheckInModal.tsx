@@ -33,6 +33,7 @@ interface Props {
   initialData?: ModalInitialData;
   onConfirm: (data: CheckInData) => void;
   onRemove?: () => void;
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -182,8 +183,10 @@ const focusHandlers = {
   },
 };
 
-export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, onClose }: Props) {
+export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, onDelete, onClose }: Props) {
   const isMobile = useIsMobile();
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [name, setName] = useState("");
   const [rating, setRating] = useState("");
   const [ratingType, setRatingType] = useState<RatingType>("");
@@ -201,6 +204,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
       setLeagueFeeMethod(initialData?.leagueFeeMethod ?? "");
       setAcePotPaid(initialData?.acePotPaid ?? false);
       setAcePotMethod(initialData?.acePotMethod ?? "");
+      setShowRemoveConfirm(false);
+      setShowDeleteConfirm(false);
     }
   }, [isOpen, initialData]);
 
@@ -234,6 +239,19 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
       : mode === "edit"
         ? "Update player info or remove from check-in"
         : "Confirm & Collect Payment";
+
+  const actionLinkStyle: React.CSSProperties = {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    textAlign: "left",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+    color: "#0077cc",
+    textDecoration: "underline",
+    textUnderlineOffset: "2px",
+  };
 
   return (
     <div
@@ -500,6 +518,17 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
               </div>
             </div>
           </div>
+
+          {mode === "edit" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <button type="button" onClick={() => setShowRemoveConfirm(true)} style={actionLinkStyle}>
+                Remove from this week&apos;s check-in
+              </button>
+              <button type="button" onClick={() => setShowDeleteConfirm(true)} style={actionLinkStyle}>
+                Delete player from database
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -536,32 +565,6 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
             Cancel
           </button>
 
-          {mode === "edit" && (
-            <button
-              onClick={onRemove}
-              style={{
-                flex: 1,
-                padding: "14px",
-                borderRadius: "12px",
-                border: "1.5px solid #fca5a5",
-                background: "#fff5f5",
-                color: "#dc2626",
-                fontSize: "15px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#fee2e2";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#fff5f5";
-              }}
-            >
-              Remove
-            </button>
-          )}
-
           <button
             onClick={handleConfirm}
             disabled={!canSubmit}
@@ -589,6 +592,246 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
           </button>
         </div>
       </div>
+
+      {showRemoveConfirm ? (
+        <div
+          onClick={() => setShowRemoveConfirm(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 20, 40, 0.55)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: isMobile ? "flex-end" : "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: isMobile ? "0" : "24px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: isMobile ? "20px 20px 0 0" : "20px",
+              boxShadow: "0 24px 64px rgba(0,43,77,0.22), 0 4px 16px rgba(0,43,77,0.1)",
+              width: "100%",
+              maxWidth: isMobile ? "100%" : "480px",
+              maxHeight: isMobile ? "92vh" : "90vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "22px 28px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "linear-gradient(135deg, #002b4d 0%, #003d66 100%)",
+              }}
+            >
+              <h2 style={{ color: "#ffffff", margin: 0, fontSize: "18px" }}>Remove Check-In</h2>
+              <button
+                onClick={() => setShowRemoveConfirm(false)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: isMobile ? "20px" : "24px 28px" }}>
+              <p style={{ margin: 0, fontSize: "15px", color: "#334155", lineHeight: 1.6 }}>
+                Are you sure you want to remove this player from this week&apos;s check-in?
+              </p>
+            </div>
+            <div
+              style={{
+                padding: isMobile ? "16px 20px" : "18px 28px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                gap: "10px",
+                background: "#f8fafc",
+                paddingBottom: isMobile ? "calc(16px + env(safe-area-inset-bottom, 0px))" : "18px",
+              }}
+            >
+              <button
+                onClick={() => setShowRemoveConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "1.5px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onRemove?.();
+                  setShowRemoveConfirm(false);
+                }}
+                style={{
+                  flex: 2,
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: "#0077cc",
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(0,119,204,0.28)",
+                }}
+              >
+                Remove Check-In
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showDeleteConfirm ? (
+        <div
+          onClick={() => setShowDeleteConfirm(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 20, 40, 0.55)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: isMobile ? "flex-end" : "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: isMobile ? "0" : "24px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: isMobile ? "20px 20px 0 0" : "20px",
+              boxShadow: "0 24px 64px rgba(0,43,77,0.22), 0 4px 16px rgba(0,43,77,0.1)",
+              width: "100%",
+              maxWidth: isMobile ? "100%" : "480px",
+              maxHeight: isMobile ? "92vh" : "90vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "22px 28px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "linear-gradient(135deg, #002b4d 0%, #003d66 100%)",
+              }}
+            >
+              <div>
+                <h2 style={{ color: "#ffffff", margin: 0, fontSize: "18px" }}>Delete Player</h2>
+                <p
+                  style={{
+                    color: "#00b4d8",
+                    margin: "4px 0 0",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Permanent roster deletion
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: isMobile ? "20px" : "24px 28px" }}>
+              <p style={{ margin: 0, fontSize: "15px", color: "#334155", lineHeight: 1.6 }}>
+                Are you sure you want to permanently delete this player from the database?
+              </p>
+            </div>
+            <div
+              style={{
+                padding: isMobile ? "16px 20px" : "18px 28px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                gap: "10px",
+                background: "#f8fafc",
+                paddingBottom: isMobile ? "calc(16px + env(safe-area-inset-bottom, 0px))" : "18px",
+              }}
+            >
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "1.5px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onDelete?.();
+                  setShowDeleteConfirm(false);
+                }}
+                style={{
+                  flex: 2,
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: "#0077cc",
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(0,119,204,0.28)",
+                }}
+              >
+                Delete Player
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

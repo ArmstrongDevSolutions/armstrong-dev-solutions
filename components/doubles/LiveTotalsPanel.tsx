@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Disc, DollarSign, Plus, TrendingUp, X } from "lucide-react";
+import { Check, Disc, DollarSign, Flag, Plus, TrendingUp, X } from "lucide-react";
 import { AcePotDonation, CheckedInPlayer } from "./types";
 import { useIsMobile } from "./useIsMobile";
+import { EndWeekModal } from "./EndWeekModal";
 
 function AddToPotModal({
   isOpen,
@@ -215,195 +216,35 @@ function AddToPotModal({
   );
 }
 
-function CashOutModal({
-  isOpen,
-  acePot,
-  onConfirm,
-  onClose,
-}: {
-  isOpen: boolean;
-  acePot: number;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  const isMobile = useIsMobile();
-  if (!isOpen) return null;
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 20, 40, 0.55)",
-        backdropFilter: "blur(3px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: isMobile ? "12px" : "24px",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#ffffff",
-          borderRadius: "20px",
-          boxShadow: "0 24px 64px rgba(0,43,77,0.22)",
-          width: "100%",
-          maxWidth: "400px",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "20px 24px 16px",
-            background: "linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div>
-            <h2 style={{ color: "#ffffff", margin: 0, fontSize: "17px" }}>Cash Out Ace Pot</h2>
-            <p
-              style={{
-                color: "#fca5a5",
-                margin: "3px 0 0",
-                fontSize: "11px",
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              This action cannot be undone
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.08)",
-              color: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div style={{ padding: "28px 24px" }}>
-          <div
-            style={{
-              padding: "20px",
-              borderRadius: "14px",
-              background: "#fff5f5",
-              border: "1.5px solid #fecaca",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "48px", fontWeight: 700, color: "#dc2626", lineHeight: 1 }}>${acePot}</div>
-            <p style={{ color: "#7f1d1d", fontSize: "14px", margin: "12px 0 0", lineHeight: 1.6 }}>
-              Are you sure you want to cash out the Ace Pot?
-              <br />
-              <strong>This will reset it to $0.</strong>
-            </p>
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: "16px 24px",
-            borderTop: "1px solid #e2e8f0",
-            display: "flex",
-            gap: "10px",
-            background: "#f8fafc",
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1,
-              padding: "14px",
-              minHeight: "52px",
-              borderRadius: "12px",
-              border: "1.5px solid #e2e8f0",
-              background: "#ffffff",
-              color: "#475569",
-              fontSize: "15px",
-              fontWeight: 600,
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              flex: 2,
-              padding: "14px",
-              minHeight: "52px",
-              borderRadius: "12px",
-              border: "none",
-              background: "#dc2626",
-              color: "#ffffff",
-              fontSize: "15px",
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(220,38,38,0.3)",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            Confirm Cash Out
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 interface Props {
   checkedInPlayers: CheckedInPlayer[];
   acePot: number;
   acePotDonations: AcePotDonation[];
-  onAddDonation: (donation: AcePotDonation) => void;
-  onCashOut: () => void;
+  isWorking?: boolean;
+  onAddDonation: (donation: AcePotDonation) => Promise<void> | void;
+  onEndWeek: (acePotHit: boolean, aceCount: number) => Promise<void> | void;
 }
 
 export function LiveTotalsPanel({
   checkedInPlayers,
   acePot,
   acePotDonations,
+  isWorking,
   onAddDonation,
-  onCashOut,
+  onEndWeek,
 }: Props) {
   const isMobile = useIsMobile();
   const [addPotOpen, setAddPotOpen] = useState(false);
-  const [cashOutOpen, setCashOutOpen] = useState(false);
+  const [endWeekOpen, setEndWeekOpen] = useState(false);
 
   const leagueFee = 8;
-  const totalFees = checkedInPlayers.length * leagueFee;
+  const totalFees = checkedInPlayers.reduce((sum, p) => sum + (p.leagueFeePaid ? leagueFee : 0), 0);
   const totalPayout = Math.round(totalFees * 0.5);
   const acePotPlayers = checkedInPlayers.filter((p) => p.acePotPaid);
 
-  function handleAddDonation(amount: number, note: string) {
-    onAddDonation({ id: `donation-${Date.now()}`, note: note || "Manual Addition", amount });
+  async function handleAddDonation(amount: number, note: string) {
+    await onAddDonation({ id: `donation-${Date.now()}`, note: note || "Manual Addition", amount });
     setAddPotOpen(false);
-  }
-
-  function handleCashOut() {
-    onCashOut();
-    setCashOutOpen(false);
   }
 
   const pad = isMobile ? "20px" : "28px 32px";
@@ -475,7 +316,7 @@ export function LiveTotalsPanel({
           </span>
         </div>
         <div style={{ fontSize: isMobile ? "44px" : "52px", fontWeight: 700, color: "#002b4d", lineHeight: 1.05, marginTop: "10px" }}>
-          ${totalPayout > 0 ? totalPayout : 128}
+          ${totalPayout}
         </div>
         <p style={{ color: "#94a3b8", fontSize: "13px", marginTop: "4px" }}>50% of league fees collected</p>
       </div>
@@ -534,66 +375,39 @@ export function LiveTotalsPanel({
         <p style={{ color: "#94a3b8", fontSize: "13px", marginTop: "4px" }}>Rolls over if no ace is hit</p>
       </div>
 
-      <div style={{ display: "flex", gap: "10px" }}>
-        <button
-          onClick={() => setAddPotOpen(true)}
-          style={{
-            flex: 1,
-            minHeight: "52px",
-            padding: "14px 12px",
-            borderRadius: "10px",
-            border: "1.5px solid #bfdbfe",
-            background: "#eff6ff",
-            color: "#0077cc",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "6px",
-            transition: "background 0.15s",
-            WebkitTapHighlightColor: "transparent",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#dbeafe";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#eff6ff";
-          }}
-        >
-          <Plus size={15} /> Add to Ace Pot
-        </button>
-        <button
-          onClick={() => setCashOutOpen(true)}
-          style={{
-            flex: 1,
-            minHeight: "52px",
-            padding: "14px 12px",
-            borderRadius: "10px",
-            border: "1.5px solid #fca5a5",
-            background: "#fff5f5",
-            color: "#dc2626",
-            fontSize: "14px",
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "6px",
-            transition: "background 0.15s",
-            WebkitTapHighlightColor: "transparent",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#fee2e2";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#fff5f5";
-          }}
-        >
-          <DollarSign size={15} /> Cash Out
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setAddPotOpen(true)}
+        disabled={isWorking}
+        style={{
+          width: "100%",
+          minHeight: "52px",
+          padding: "14px 12px",
+          borderRadius: "10px",
+          border: "1.5px solid #bfdbfe",
+          background: "#eff6ff",
+          color: "#0077cc",
+          fontSize: "14px",
+          fontWeight: 600,
+          cursor: isWorking ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "6px",
+          transition: "background 0.15s",
+          WebkitTapHighlightColor: "transparent",
+        }}
+        onMouseEnter={(e) => {
+          if (isWorking) return;
+          e.currentTarget.style.background = "#dbeafe";
+        }}
+        onMouseLeave={(e) => {
+          if (isWorking) return;
+          e.currentTarget.style.background = "#eff6ff";
+        }}
+      >
+        <Plus size={15} /> Add to Ace Pot
+      </button>
 
       {(acePotPlayers.length > 0 || acePotDonations.length > 0) && (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -686,8 +500,53 @@ export function LiveTotalsPanel({
         </div>
       )}
 
+      <div
+        style={{
+          height: "1px",
+          width: "100%",
+          background: "linear-gradient(90deg, transparent, rgba(0, 119, 204, 0.28), transparent)",
+          opacity: 0.65,
+          marginTop: "6px",
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={() => setEndWeekOpen(true)}
+        disabled={isWorking}
+        style={{
+          width: "100%",
+          minHeight: "52px",
+          padding: "14px 18px",
+          borderRadius: "12px",
+          border: "none",
+          background: "#002b4d",
+          color: "#ffffff",
+          fontSize: "15px",
+          fontWeight: 700,
+          cursor: isWorking ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+          boxShadow: "0 4px 14px rgba(0,43,77,0.22)",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        <Flag size={18} strokeWidth={2.25} aria-hidden />
+        End Week
+      </button>
+
+      <EndWeekModal
+        isOpen={endWeekOpen}
+        onClose={() => setEndWeekOpen(false)}
+        playerCount={checkedInPlayers.length}
+        totalPayoutPool={totalPayout}
+        acePotTotal={acePot}
+        onConfirm={onEndWeek}
+      />
+
       <AddToPotModal isOpen={addPotOpen} onConfirm={handleAddDonation} onClose={() => setAddPotOpen(false)} />
-      <CashOutModal isOpen={cashOutOpen} acePot={acePot} onConfirm={handleCashOut} onClose={() => setCashOutOpen(false)} />
     </div>
   );
 }

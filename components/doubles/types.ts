@@ -1,6 +1,6 @@
 export interface CheckedInPlayer {
   uid: string;
-  rosterId?: number;
+  rosterId?: string;
   name: string;
   rating: number;
   ratingType: "PDGA" | "UDisc" | "Other";
@@ -14,4 +14,11 @@ export interface AcePotDonation {
   id: string;
   note: string;
   amount: number;
+}
+
+export interface RosterPlayer {
+  id: string;
+  name: string;
+  rating: number;
+  ratingType: "PDGA" | "UDisc" | "Other";
 }

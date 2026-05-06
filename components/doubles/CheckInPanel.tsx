@@ -1,29 +1,72 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, Disc, Search, Trophy, UserPlus } from "lucide-react";
+import { Disc, Search, Trophy, UserPlus, X } from "lucide-react";
 import { CheckInData, CheckInModal } from "./CheckInModal";
-import { CheckedInPlayer } from "./types";
+import { comparablePdgaRating } from "./poolRating";
+import { CheckedInPlayer, RosterPlayer } from "./types";
 import { useIsMobile } from "./useIsMobile";
 
-// Placeholder roster data from Figma handoff.
-// TODO: replace with API/database roster read when backend is added.
-const ROSTER = [
-  { id: 1, name: "John Smith", rating: 912 },
-  { id: 2, name: "Maria Garcia", rating: 887 },
-  { id: 3, name: "Tyler Brooks", rating: 945 },
-  { id: 4, name: "Aisha Johnson", rating: 831 },
-  { id: 5, name: "Derek Nguyen", rating: 960 },
-];
-
 type ModalTarget =
-  | { mode: "existing"; player: (typeof ROSTER)[number] }
+  | { mode: "existing"; player: RosterPlayer }
   | { mode: "new" }
   | { mode: "edit"; player: CheckedInPlayer };
 
+function normalizePersonName(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function tokenize(name: string) {
+  return normalizePersonName(name).split(" ").filter(Boolean);
+}
+
+function findDuplicateRosterPlayer(roster: RosterPlayer[], enteredName: string): RosterPlayer | undefined {
+  const n = normalizePersonName(enteredName);
+  if (!n) return undefined;
+  return roster.find((p) => normalizePersonName(p.name) === n);
+}
+
+/** Suggest an unchecked roster row when the typed name looks like a nickname / subset (e.g. “Mike” vs “Mike Armstrong”). */
+function findSimilarRosterPlayer(
+  roster: RosterPlayer[],
+  enteredName: string,
+  excludeCheckedInIds: Set<string>,
+): RosterPlayer | undefined {
+  const n = normalizePersonName(enteredName);
+  if (n.length < 2) return undefined;
+
+  function matches(rosterName: string) {
+    const r = normalizePersonName(rosterName);
+    if (r === n) return false;
+    const nt = tokenize(enteredName);
+    const rt = tokenize(rosterName);
+
+    // Prefix nickname (e.g. "Mike" vs "Mike Armstrong") — boundary after typed segment
+    if (r.startsWith(n) && (r.length === n.length || r[n.length] === " ")) return true;
+
+    // One typed token equals roster first name (multi-word roster only)
+    if (nt.length === 1 && rt.length >= 2 && nt[0]!.length >= 2 && nt[0] === rt[0]) return true;
+
+    return false;
+  }
+
+  const candidates = roster.filter((p) => !excludeCheckedInIds.has(p.id) && matches(p.name));
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0];
+
+  return [...candidates].sort(
+    (a, b) =>
+      normalizePersonName(a.name).localeCompare(normalizePersonName(b.name)) ||
+      a.name.localeCompare(b.name),
+  )[0];
+}
+
 function computePools(players: CheckedInPlayer[]) {
   if (players.length === 0) return { aPool: [] as CheckedInPlayer[], bPool: [] as CheckedInPlayer[] };
-  const sorted = [...players].sort((a, b) => b.rating - a.rating);
+  const sorted = [...players].sort(
+    (a, b) => comparablePdgaRating(b.rating, b.ratingType) - comparablePdgaRating(a.rating, a.ratingType),
+  );
+  // Odd player count: A Pool gets the extra slot (ceil(n/2) strongest-first slice).
   const aCount = Math.ceil(sorted.length / 2);
   const byAlpha = (arr: CheckedInPlayer[]) => [...arr].sort((a, b) => a.name.localeCompare(b.name));
   return { aPool: byAlpha(sorted.slice(0, aCount)), bPool: byAlpha(sorted.slice(aCount)) };
@@ -94,6 +137,8 @@ function PoolColumn({
     <div
       style={{
         flex: 1,
+        width: isMobile ? "100%" : undefined,
+        minWidth: 0,
         background: "#ffffff",
         borderRadius: "14px",
         border: `1.5px solid ${borderColor}`,
@@ -125,7 +170,7 @@ function PoolColumn({
         </span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
         {players.length === 0 && (
           <p style={{ color: "#94a3b8", fontSize: "13px", textAlign: "center", padding: "20px 12px", margin: 0 }}>
             No players yet
@@ -136,13 +181,17 @@ function PoolColumn({
             key={p.uid}
             onClick={() => onPlayerClick(p)}
             style={{
-              padding: isMobile ? "16px" : "12px 14px",
-              minHeight: "52px",
-              borderTop: i >= 0 ? "1px solid #f1f5f9" : "none",
+              padding: "12px 14px",
+              height: "76px",
+              minHeight: "76px",
+              maxHeight: "76px",
+              boxSizing: "border-box",
+              borderTop: i === 0 ? "none" : "1px solid #f1f5f9",
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
-              gap: "5px",
+              gap: "4px",
+              flexShrink: 0,
               cursor: "pointer",
               transition: "background 0.12s",
               WebkitTapHighlightColor: "transparent",
@@ -173,19 +222,37 @@ function PoolColumn({
 
 interface Props {
   checkedInPlayers: CheckedInPlayer[];
-  onAddPlayer: (player: CheckedInPlayer) => void;
-  onRemovePlayer: (uid: string) => void;
-  onUpdatePlayer: (player: CheckedInPlayer) => void;
+  rosterPlayers: RosterPlayer[];
+  isWorking?: boolean;
+  onAddExistingPlayer: (player: RosterPlayer, data: CheckInData) => Promise<void> | void;
+  onAddNewPlayer: (data: CheckInData) => Promise<void> | void;
+  onRemovePlayer: (uid: string) => Promise<void> | void;
+  onDeletePlayer: (uid: string) => Promise<void> | void;
+  onUpdatePlayer: (uid: string, data: CheckInData) => Promise<void> | void;
 }
 
-export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, onUpdatePlayer }: Props) {
+export function CheckInPanel({
+  checkedInPlayers,
+  rosterPlayers,
+  isWorking,
+  onAddExistingPlayer,
+  onAddNewPlayer,
+  onRemovePlayer,
+  onDeletePlayer,
+  onUpdatePlayer,
+}: Props) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [modalTarget, setModalTarget] = useState<ModalTarget | null>(null);
+  const [duplicateNameBlock, setDuplicateNameBlock] = useState<{ entered: string; rosterName: string } | null>(null);
+  const [similarSuggest, setSimilarSuggest] = useState<{ roster: RosterPlayer; draft: CheckInData } | null>(null);
 
   const checkedInRosterIds = new Set(checkedInPlayers.map((p) => p.rosterId).filter(Boolean));
   const searchResults = query.trim()
-    ? ROSTER.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
+    ? rosterPlayers.filter(
+        (p) =>
+          !checkedInRosterIds.has(p.id) && p.name.toLowerCase().includes(query.trim().toLowerCase()),
+      )
     : [];
 
   const { aPool, bPool } = computePools(checkedInPlayers);
@@ -195,59 +262,70 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
     setModalTarget(target);
   }
 
-  function handleRemoveFromSearch(player: (typeof ROSTER)[number]) {
-    const cp = checkedInPlayers.find((p) => p.rosterId === player.id);
-    if (cp) onRemovePlayer(cp.uid);
-  }
-
-  function handleModalConfirm(data: CheckInData) {
+  async function handleModalConfirm(data: CheckInData) {
     if (!modalTarget) return;
     if (modalTarget.mode === "existing") {
-      onAddPlayer({
-        uid: `roster-${modalTarget.player.id}`,
-        rosterId: modalTarget.player.id,
-        name: data.name,
-        rating: data.rating,
-        ratingType: data.ratingType,
-        leagueFeePaid: data.leagueFeePaid,
-        leagueFeeMethod: data.leagueFeeMethod,
-        acePotPaid: data.acePotPaid,
-        acePotMethod: data.acePotMethod,
-      });
-    } else if (modalTarget.mode === "new") {
-      onAddPlayer({
-        uid: `new-${Date.now()}`,
-        name: data.name,
-        rating: data.rating,
-        ratingType: data.ratingType,
-        leagueFeePaid: data.leagueFeePaid,
-        leagueFeeMethod: data.leagueFeeMethod,
-        acePotPaid: data.acePotPaid,
-        acePotMethod: data.acePotMethod,
-      });
-    } else if (modalTarget.mode === "edit") {
-      onUpdatePlayer({
-        ...modalTarget.player,
-        name: data.name,
-        rating: data.rating,
-        ratingType: data.ratingType,
-        leagueFeePaid: data.leagueFeePaid,
-        leagueFeeMethod: data.leagueFeeMethod,
-        acePotPaid: data.acePotPaid,
-        acePotMethod: data.acePotMethod,
-      });
+      await onAddExistingPlayer(modalTarget.player, data);
+      setModalTarget(null);
+      return;
     }
+    if (modalTarget.mode === "edit") {
+      await onUpdatePlayer(modalTarget.player.uid, data);
+      setModalTarget(null);
+      return;
+    }
+
+    if (modalTarget.mode === "new") {
+      const dup = findDuplicateRosterPlayer(rosterPlayers, data.name);
+      if (dup) {
+        setModalTarget(null);
+        setDuplicateNameBlock({ entered: data.name.trim(), rosterName: dup.name });
+        return;
+      }
+      const similar = findSimilarRosterPlayer(rosterPlayers, data.name, checkedInRosterIds);
+      if (similar) {
+        setModalTarget(null);
+        setSimilarSuggest({ roster: similar, draft: data });
+        return;
+      }
+      await onAddNewPlayer(data);
+      setModalTarget(null);
+    }
+  }
+
+  async function handleSimilarNoCreateAnyway() {
+    if (!similarSuggest) return;
+    const { draft } = similarSuggest;
+    setSimilarSuggest(null);
+    await onAddNewPlayer(draft);
+  }
+
+  function handleSimilarYesExisting() {
+    if (!similarSuggest) return;
+    const { roster } = similarSuggest;
+    setSimilarSuggest(null);
+    openModal({ mode: "existing", player: roster });
+  }
+
+  async function handleModalRemove() {
+    if (modalTarget?.mode === "edit") await onRemovePlayer(modalTarget.player.uid);
     setModalTarget(null);
   }
 
-  function handleModalRemove() {
-    if (modalTarget?.mode === "edit") onRemovePlayer(modalTarget.player.uid);
+  async function handleModalDelete() {
+    if (modalTarget?.mode === "edit") await onDeletePlayer(modalTarget.player.uid);
     setModalTarget(null);
   }
 
   function getInitialData() {
     if (!modalTarget) return undefined;
-    if (modalTarget.mode === "existing") return { name: modalTarget.player.name, rating: modalTarget.player.rating };
+    if (modalTarget.mode === "existing") {
+      return {
+        name: modalTarget.player.name,
+        rating: modalTarget.player.rating,
+        ratingType: modalTarget.player.ratingType,
+      };
+    }
     if (modalTarget.mode === "edit") {
       const p = modalTarget.player;
       return {
@@ -274,6 +352,7 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
 
       <button
         onClick={() => openModal({ mode: "new" })}
+        disabled={isWorking}
         style={{
           width: "100%",
           minHeight: "52px",
@@ -284,7 +363,7 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
           color: "#0077cc",
           fontSize: "15px",
           fontWeight: 600,
-          cursor: "pointer",
+          cursor: isWorking ? "not-allowed" : "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -293,10 +372,12 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
           WebkitTapHighlightColor: "transparent",
         }}
         onMouseEnter={(e) => {
+          if (isWorking) return;
           e.currentTarget.style.background = "#dbeafe";
           e.currentTarget.style.borderColor = "#60a5fa";
         }}
         onMouseLeave={(e) => {
+          if (isWorking) return;
           e.currentTarget.style.background = "#eff6ff";
           e.currentTarget.style.borderColor = "#93c5fd";
         }}
@@ -319,7 +400,7 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
               width: "100%",
               minHeight: "52px",
               paddingLeft: "42px",
-              paddingRight: "16px",
+              paddingRight: query.trim().length > 0 ? "44px" : "16px",
               paddingTop: "14px",
               paddingBottom: "14px",
               borderRadius: "12px",
@@ -340,6 +421,39 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
               e.currentTarget.style.boxShadow = "none";
             }}
           />
+          {query.trim().length > 0 ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQuery("")}
+              style={{
+                position: "absolute",
+                right: "10px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                border: "none",
+                background: "transparent",
+                color: "#0077cc",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.15s",
+                WebkitTapHighlightColor: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#eff6ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <X size={18} strokeWidth={2.25} aria-hidden />
+            </button>
+          ) : null}
         </div>
 
         {query.trim().length > 0 && (
@@ -360,77 +474,50 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
                 No players found — use &quot;+ Add New Player&quot; above
               </p>
             ) : (
-              searchResults.map((player) => {
-                const isIn = checkedInRosterIds.has(player.id);
-                return (
-                  <div
-                    key={player.id}
+              searchResults.map((player) => (
+                <div
+                  key={player.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: isMobile ? "14px" : "12px 14px",
+                    minHeight: "60px",
+                    borderRadius: "10px",
+                    background: "#f8faff",
+                    border: "1.5px solid #e2e8f0",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+                    <span style={{ fontSize: "15px", fontWeight: 600, color: "#002b4d" }}>{player.name}</span>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      Rating: <strong style={{ color: "#0077cc" }}>{player.rating}</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openModal({ mode: "existing", player })}
+                    disabled={isWorking}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: isMobile ? "14px" : "12px 14px",
-                      minHeight: "60px",
+                      padding: "10px 20px",
+                      minHeight: "48px",
                       borderRadius: "10px",
-                      background: isIn ? "#eff6ff" : "#f8faff",
-                      border: `1.5px solid ${isIn ? "#93c5fd" : "#e2e8f0"}`,
-                      gap: "10px",
+                      border: "none",
+                      background: "#0077cc",
+                      color: "#ffffff",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      cursor: isWorking ? "not-allowed" : "pointer",
+                      flexShrink: 0,
+                      boxShadow: "0 2px 6px rgba(0,119,204,0.25)",
+                      WebkitTapHighlightColor: "transparent",
                     }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span style={{ fontSize: "15px", fontWeight: 600, color: "#002b4d" }}>{player.name}</span>
-                      <span style={{ fontSize: "12px", color: "#64748b" }}>
-                        Rating: <strong style={{ color: "#0077cc" }}>{player.rating}</strong>
-                      </span>
-                    </div>
-                    {isIn ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#16a34a" }}>
-                          <CheckCircle size={15} />
-                          <span style={{ fontSize: "13px", fontWeight: 600 }}>Checked In</span>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveFromSearch(player)}
-                          style={{
-                            padding: "8px 14px",
-                            minHeight: "40px",
-                            borderRadius: "8px",
-                            border: "1.5px solid #fca5a5",
-                            background: "#fff5f5",
-                            color: "#dc2626",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            WebkitTapHighlightColor: "transparent",
-                          }}
-                        >
-                          Undo
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => openModal({ mode: "existing", player })}
-                        style={{
-                          padding: "10px 20px",
-                          minHeight: "48px",
-                          borderRadius: "10px",
-                          border: "none",
-                          background: "#0077cc",
-                          color: "#ffffff",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          flexShrink: 0,
-                          boxShadow: "0 2px 6px rgba(0,119,204,0.25)",
-                          WebkitTapHighlightColor: "transparent",
-                        }}
-                      >
-                        Check In
-                      </button>
-                    )}
-                  </div>
-                );
-              })
+                    Check In
+                  </button>
+                </div>
+              ))
             )}
           </div>
         )}
@@ -464,7 +551,7 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
             display: "flex",
             flexDirection: isMobile ? "column" : "row",
             gap: isMobile ? "14px" : "12px",
-            alignItems: "stretch",
+            alignItems: "flex-start",
           }}
         >
           <PoolColumn
@@ -492,8 +579,236 @@ export function CheckInPanel({ checkedInPlayers, onAddPlayer, onRemovePlayer, on
         initialData={getInitialData()}
         onConfirm={handleModalConfirm}
         onRemove={handleModalRemove}
+        onDelete={handleModalDelete}
         onClose={() => setModalTarget(null)}
       />
+
+      {duplicateNameBlock ? (
+        <div
+          onClick={() => setDuplicateNameBlock(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 20, 40, 0.55)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: isMobile ? "flex-end" : "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: isMobile ? "0" : "24px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: isMobile ? "20px 20px 0 0" : "20px",
+              boxShadow: "0 24px 64px rgba(0,43,77,0.22)",
+              width: "100%",
+              maxWidth: "480px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "22px 28px 18px",
+                background: "linear-gradient(135deg, #002b4d 0%, #003d66 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <h2 style={{ color: "#ffffff", margin: 0, fontSize: "18px" }}>Name Already Exists</h2>
+              <button
+                type="button"
+                onClick={() => setDuplicateNameBlock(null)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: isMobile ? "20px" : "24px 28px" }}>
+              <p style={{ margin: 0, fontSize: "15px", color: "#334155", lineHeight: 1.6 }}>
+                <strong>{duplicateNameBlock.entered}</strong> is the same name as existing roster player{" "}
+                <strong>{duplicateNameBlock.rosterName}</strong>. Search the roster to check them in, or use a different
+                name.
+              </p>
+            </div>
+            <div
+              style={{
+                padding: isMobile ? "16px 20px" : "18px 28px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                paddingBottom: isMobile ? "calc(16px + env(safe-area-inset-bottom, 0px))" : "18px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDuplicateNameBlock(null)}
+                style={{
+                  width: "100%",
+                  minHeight: "52px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: "#0077cc",
+                  color: "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 10px rgba(0,119,204,0.28)",
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {similarSuggest ? (
+        <div
+          onClick={() => setSimilarSuggest(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 20, 40, 0.55)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: isMobile ? "flex-end" : "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: isMobile ? "0" : "24px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: isMobile ? "20px 20px 0 0" : "20px",
+              boxShadow: "0 24px 64px rgba(0,43,77,0.22)",
+              width: "100%",
+              maxWidth: "480px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "22px 28px 18px",
+                background: "linear-gradient(135deg, #002b4d 0%, #003d66 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <h2 style={{ color: "#ffffff", margin: 0, fontSize: "18px" }}>Similar name found</h2>
+              <button
+                type="button"
+                onClick={() => setSimilarSuggest(null)}
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: isMobile ? "20px" : "24px 28px" }}>
+              <p style={{ margin: 0, fontSize: "15px", color: "#334155", lineHeight: 1.6 }}>
+                Did you mean to check in <strong>{similarSuggest.roster.name}</strong> instead?
+              </p>
+            </div>
+            <div
+              style={{
+                padding: isMobile ? "16px 20px" : "18px 28px",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                gap: "10px",
+                background: "#f8fafc",
+                paddingBottom: isMobile ? "calc(16px + env(safe-area-inset-bottom, 0px))" : "18px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSimilarSuggest(null)}
+                style={{
+                  flex: 1,
+                  minHeight: "52px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "1.5px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSimilarNoCreateAnyway()}
+                disabled={isWorking}
+                style={{
+                  flex: 1,
+                  minHeight: "52px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "1.5px solid #bfdbfe",
+                  background: "#eff6ff",
+                  color: "#0077cc",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: isWorking ? "not-allowed" : "pointer",
+                }}
+              >
+                No — create new
+              </button>
+              <button
+                type="button"
+                onClick={handleSimilarYesExisting}
+                disabled={isWorking}
+                style={{
+                  flex: 2,
+                  minHeight: "52px",
+                  padding: "14px",
+                  borderRadius: "12px",
+                  border: "none",
+                  background: isWorking ? "#e2e8f0" : "#0077cc",
+                  color: isWorking ? "#94a3b8" : "#ffffff",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: isWorking ? "not-allowed" : "pointer",
+                  boxShadow: isWorking ? "none" : "0 2px 10px rgba(0,119,204,0.28)",
+                }}
+              >
+                Yes — check them in
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
