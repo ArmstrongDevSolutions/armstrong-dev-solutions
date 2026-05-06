@@ -247,7 +247,9 @@ export function CheckInPanel({
   const [duplicateNameBlock, setDuplicateNameBlock] = useState<{ entered: string; rosterName: string } | null>(null);
   const [similarSuggest, setSimilarSuggest] = useState<{ roster: RosterPlayer; draft: CheckInData } | null>(null);
 
-  const checkedInRosterIds = new Set(checkedInPlayers.map((p) => p.rosterId).filter(Boolean));
+  const checkedInRosterIds = new Set(
+    checkedInPlayers.map((p) => p.rosterId).filter((id): id is string => Boolean(id)),
+  );
   const searchResults = query.trim()
     ? rosterPlayers.filter(
         (p) =>
