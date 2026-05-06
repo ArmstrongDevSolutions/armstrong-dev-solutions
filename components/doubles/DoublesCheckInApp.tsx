@@ -199,7 +199,7 @@ export default function DoublesCheckInApp() {
     e.preventDefault();
     if (!hasSupabaseConfig) {
       setAuthError(
-        "Missing Supabase config. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+        "Supabase env missing on prod. In Vercel → Environment Variables, add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (or PUBLISHABLE_KEY) for Production, then redeploy.",
       );
       return;
     }
@@ -225,7 +225,7 @@ export default function DoublesCheckInApp() {
   async function handleRequestPasswordReset() {
     if (!hasSupabaseConfig) {
       setAuthError(
-        "Missing Supabase config. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+        "Supabase env missing on prod. In Vercel → Environment Variables, add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (or PUBLISHABLE_KEY) for Production, then redeploy.",
       );
       return;
     }
