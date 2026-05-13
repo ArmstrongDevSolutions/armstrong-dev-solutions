@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Check, CreditCard, Disc, Hash, X } from "lucide-react";
+import { COURSE_RATING_TABLES, type CourseRatingTableId } from "./courseEstimatedRatingData";
+import {
+  estimateRatingFromCourseAndRelativeDelta,
+  parseRelativeScoreToDelta,
+} from "./estimateFromCourseRelativeScore";
 import { useIsMobile } from "./useIsMobile";
+
+const COURSE_SELECT_ORDER: CourseRatingTableId[] = ["brownDeer", "estabrook", "dretzka"];
 
 type PaymentMethod = "" | "Cash" | "Venmo" | "PayPal";
 type RatingType = "" | "PDGA" | "UDisc" | "Other";
@@ -197,6 +204,8 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
   const [leagueFeeMethod, setLeagueFeeMethod] = useState<PaymentMethod>("");
   const [acePotPaid, setAcePotPaid] = useState(false);
   const [acePotMethod, setAcePotMethod] = useState<PaymentMethod>("");
+  const [otherCourseId, setOtherCourseId] = useState<CourseRatingTableId | "">("");
+  const [relativeScoreInput, setRelativeScoreInput] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -208,10 +217,28 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
       setLeagueFeeMethod(initialData?.leagueFeeMethod ?? "");
       setAcePotPaid(initialData?.acePotPaid ?? false);
       setAcePotMethod(initialData?.acePotMethod ?? "");
+      setOtherCourseId("");
+      setRelativeScoreInput("");
       setShowRemoveConfirm(false);
       setShowDeleteConfirm(false);
     }
   }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (ratingType !== "Other") {
+      setOtherCourseId("");
+      setRelativeScoreInput("");
+    }
+  }, [ratingType]);
+
+  useEffect(() => {
+    if (ratingType !== "Other" || otherCourseId === "") return;
+    const delta = parseRelativeScoreToDelta(relativeScoreInput);
+    if (delta === null) return;
+    const est = estimateRatingFromCourseAndRelativeDelta(otherCourseId, delta);
+    if (est === null) return;
+    setRating(String(est));
+  }, [ratingType, otherCourseId, relativeScoreInput]);
 
   if (!isOpen) return null;
 
@@ -415,6 +442,48 @@ export function CheckInModal({ isOpen, mode, initialData, onConfirm, onRemove, o
               </select>
             </div>
           </div>
+
+          {ratingType === "Other" && (
+            <>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#002b4d" }}>Score</label>
+                  <input
+                    type="text"
+                    placeholder="E, -3, +8"
+                    value={relativeScoreInput}
+                    onChange={(e) => setRelativeScoreInput(e.target.value)}
+                    style={inputBase}
+                    {...focusHandlers}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                  />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#002b4d" }}>Course</label>
+                  <select
+                    value={otherCourseId}
+                    onChange={(e) => setOtherCourseId((e.target.value || "") as CourseRatingTableId | "")}
+                    style={{ ...inputBase, cursor: "pointer", appearance: "auto" }}
+                    {...focusHandlers}
+                  >
+                    <option value="" disabled>
+                      Select course…
+                    </option>
+                    {COURSE_SELECT_ORDER.map((id) => {
+                      const t = COURSE_RATING_TABLES[id];
+                      if (!t) return null;
+                      return (
+                        <option key={id} value={id}>
+                          {t.displayName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <SectionDivider label="League Fee" />
